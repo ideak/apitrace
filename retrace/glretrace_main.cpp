@@ -179,7 +179,8 @@ beginProfile(trace::Call &call, bool isDraw) {
     query.isDraw = isDraw;
     query.call = call.no;
     query.sig = call.sig;
-    query.program = glretrace::currentContext ? glretrace::currentContext->activeProgram : 0;
+    query.program = glretrace::getCurrentContext() ?
+            glretrace::getCurrentContext()->activeProgram : 0;
 
     /* GPU profiling only for draw calls */
     if (isDraw) {
@@ -262,7 +263,7 @@ initContext() {
 
     /* Setup debug message call back */
     if (retrace::debug && supportsDebugOutput) {
-        glDebugMessageCallbackARB(&debugOutputCallback, currentContext);
+        glDebugMessageCallbackARB(&debugOutputCallback, getCurrentContext());
 
         if (DEBUG_OUTPUT_SYNCHRONOUS) {
             glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
@@ -283,6 +284,8 @@ initContext() {
 
 void
 frame_complete(trace::Call &call) {
+    glws::Drawable *currentDrawable = getCurrentDrawable();
+
     if (retrace::profiling) {
         /* Complete any remaining queries */
         flushQueries();
@@ -310,7 +313,7 @@ frame_complete(trace::Call &call) {
 
     retrace::frameComplete(call);
 
-    if (!currentDrawable) {
+    if (currentDrawable) {
         return;
     }
 
@@ -404,7 +407,7 @@ retrace::addCallbacks(retrace::Retracer &retracer)
 
 image::Image *
 retrace::getSnapshot(void) {
-    if (!glretrace::currentDrawable) {
+    if (!glretrace::getCurrentDrawable()) {
         return NULL;
     }
 
@@ -416,8 +419,8 @@ bool
 retrace::dumpState(std::ostream &os)
 {
     if (glretrace::insideGlBeginEnd ||
-        !glretrace::currentDrawable ||
-        !glretrace::currentContext) {
+        !glretrace::getCurrentDrawable() ||
+        !glretrace::getCurrentContext()) {
         return false;
     }
 

@@ -40,10 +40,6 @@
 namespace glretrace {
 
 
-glws::Drawable *currentDrawable = NULL;
-Context *currentContext = NULL;
-
-
 static glws::Visual *
 visuals[glws::PROFILE_MAX];
 
@@ -111,6 +107,9 @@ createContext(Context *shareContext) {
 bool
 makeCurrent(trace::Call &call, glws::Drawable *drawable, Context *context)
 {
+    glws::Drawable *currentDrawable = getCurrentDrawable();
+    Context *currentContext = getCurrentContext();
+
     if (drawable == currentDrawable && context == currentContext) {
         return true;
     }
@@ -140,11 +139,11 @@ makeCurrent(trace::Call &call, glws::Drawable *drawable, Context *context)
     }
 
     if (drawable && context) {
-        currentDrawable = drawable;
-        currentContext = context;
+        setCurrentDrawable(drawable);
+        setCurrentContext(context);
     } else {
-        currentDrawable = NULL;
-        currentContext = NULL;
+        setCurrentDrawable(NULL);
+        setCurrentContext(NULL);
     }
 
     return true;
@@ -161,6 +160,8 @@ makeCurrent(trace::Call &call, glws::Drawable *drawable, Context *context)
  */
 void
 updateDrawable(int width, int height) {
+    glws::Drawable *currentDrawable = getCurrentDrawable();
+
     if (!currentDrawable) {
         return;
     }

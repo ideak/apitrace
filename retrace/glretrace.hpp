@@ -26,6 +26,8 @@
 #ifndef _GLRETRACE_HPP_
 #define _GLRETRACE_HPP_
 
+#include <GL/gl.h>
+
 #include "glws.hpp"
 #include "retrace.hpp"
 
@@ -53,9 +55,17 @@ struct Context {
 extern bool insideList;
 extern bool insideGlBeginEnd;
 
+Context *
+getCurrentContext(void);
 
-extern glws::Drawable *currentDrawable;
-extern Context *currentContext;
+void
+setCurrentContext(Context *context);
+
+glws::Drawable *
+getCurrentDrawable(void);
+
+void
+setCurrentDrawable(glws::Drawable *drawable);
 
 glws::Drawable *
 createDrawable(glws::Profile profile);

@@ -92,6 +92,9 @@ static void retrace_CGLSetCurrentContext(trace::Call &call) {
 
 
 static void retrace_CGLFlushDrawable(trace::Call &call) {
+    glws::Drawable *currentDrawable = getCurrentDrawable();
+    Context *currentContext = getCurrentContext();
+
     if (currentDrawable && currentContext) {
         if (retrace::doubleBuffer) {
             currentDrawable->swapBuffers();

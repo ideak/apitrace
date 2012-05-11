@@ -33,6 +33,7 @@
 #include "glretrace.hpp"
 #include "os.hpp"
 #include "eglsize.hpp"
+#include "os_thread.hpp"
 
 #ifndef EGL_OPENGL_ES_API
 #define EGL_OPENGL_ES_API		0x30A0
@@ -42,8 +43,36 @@
 #endif
 
 
-using namespace glretrace;
+namespace glretrace
+{
 
+class EglThreadState {
+	unsigned int current_api;
+	glws::Profile last_profile;
+public:
+	unsigned int get_current_api(void)
+	{
+		return current_api;
+	}
+
+	void set_current_api(unsigned int api)
+	{
+		current_api = api;
+	}
+
+	glws::Profile get_last_profile(void)
+	{
+		return last_profile;
+	}
+
+	void set_last_profile(glws::Profile profile)
+	{
+		last_profile = profile;
+	}
+
+	EglThreadState(void) : current_api(EGL_OPENGL_ES_API),
+			    last_profile(glws::PROFILE_COMPAT) { }
+};
 
 typedef std::map<unsigned long long, glws::Drawable *> DrawableMap;
 typedef std::map<unsigned long long, Context *> ContextMap;
@@ -52,8 +81,19 @@ static DrawableMap drawable_map;
 static ContextMap context_map;
 static ProfileMap profile_map;
 
-static unsigned int current_api = EGL_OPENGL_ES_API;
-static glws::Profile last_profile = glws::PROFILE_COMPAT;
+static os::thread_specific_ptr<class EglThreadState> egl_thread_state;
+
+static EglThreadState *get_egl_thread_state(void)
+{
+	EglThreadState *ts = egl_thread_state.get();
+
+	if (!ts) {
+		ts = new EglThreadState;
+		egl_thread_state.reset(ts);
+	}
+
+	return ts;
+}
 
 static void
 createDrawable(unsigned long long orig_config, unsigned long long orig_surface);
@@ -100,7 +140,7 @@ static void createDrawable(unsigned long long orig_config, unsigned long long or
     if (it != profile_map.end()) {
         profile = it->second;
     } else {
-        profile = last_profile;
+        profile = get_egl_thread_state()->get_last_profile();
     }
 
     glws::Drawable *drawable = glretrace::createDrawable(profile);
@@ -127,7 +167,7 @@ static void retrace_eglDestroySurface(trace::Call &call) {
     it = drawable_map.find(orig_surface);
 
     if (it != drawable_map.end()) {
-        if (it->second != currentDrawable) {
+        if (it->second != getCurrentDrawable()) {
             // TODO: reference count
             delete it->second;
         }
@@ -136,17 +176,18 @@ static void retrace_eglDestroySurface(trace::Call &call) {
 }
 
 static void retrace_eglBindAPI(trace::Call &call) {
-    current_api = call.arg(0).toUInt();
+    get_egl_thread_state()->set_current_api(call.arg(0).toUInt());
 }
 
 static void retrace_eglCreateContext(trace::Call &call) {
+    EglThreadState *ts = get_egl_thread_state();
     unsigned long long orig_context = call.ret->toUIntPtr();
     unsigned long long orig_config = call.arg(1).toUIntPtr();
     Context *share_context = getContext(call.arg(2).toUIntPtr());
     trace::Array *attrib_array = dynamic_cast<trace::Array *>(&call.arg(3));
     glws::Profile profile;
 
-    switch (current_api) {
+    switch (ts->get_current_api()) {
     case EGL_OPENGL_API:
         profile = glws::PROFILE_COMPAT;
         break;
@@ -192,7 +233,7 @@ static void retrace_eglCreateContext(trace::Call &call) {
 
     context_map[orig_context] = context;
     profile_map[orig_config] = profile;
-    last_profile = profile;
+    ts->set_last_profile(profile);
 }
 
 static void retrace_eglDestroyContext(trace::Call &call) {
@@ -216,6 +257,7 @@ static void retrace_eglMakeCurrent(trace::Call &call) {
 
 
 static void retrace_eglSwapBuffers(trace::Call &call) {
+    glws::Drawable *currentDrawable = getCurrentDrawable();
     frame_complete(call);
 
     if (retrace::doubleBuffer && currentDrawable) {
@@ -225,7 +267,7 @@ static void retrace_eglSwapBuffers(trace::Call &call) {
     }
 }
 
-const retrace::Entry glretrace::egl_callbacks[] = {
+const retrace::Entry egl_callbacks[] = {
     {"eglGetError", &retrace::ignore},
     {"eglGetDisplay", &retrace::ignore},
     {"eglInitialize", &retrace::ignore},
@@ -265,3 +307,5 @@ const retrace::Entry glretrace::egl_callbacks[] = {
     {"glEGLImageTargetTexture2DOES", &retrace::ignore},
     {NULL, NULL},
 };
+
+}

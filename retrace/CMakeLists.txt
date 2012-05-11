@@ -53,6 +53,7 @@ add_library (glretrace_common
     glretrace_egl.cpp
     glretrace_main.cpp
     glretrace_ws.cpp
+    glretrace_state.cpp
     glstate.cpp
     glstate_images.cpp
     glstate_params.cpp
